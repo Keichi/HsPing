@@ -1,6 +1,6 @@
 --Haskellでpingを送る
 --バイナリ処理・生ソケットを触る練習
-
+--------------------------------------------------------------------------------
 module Main where
 
 import Foreign
@@ -28,9 +28,6 @@ kICMP_ECHO               =   8
 data StructMember = W8 Word8
     |W16    Word16
     |W32    Word32
-    |I8     Int8
-    |I16    Int16
-    |I32    Int32
 
 --与えられた長さのバッファのチェックサムを計算する
 --1の補数和の補数
@@ -44,7 +41,8 @@ calcChkSum ptr size = do
     return $ calcChkSum' values'
     where
         calcChkSum' values =
-            fromIntegral . complement . carry . carry . sum $ map fromIntegral values
+            fromIntegral
+                . complement . carry . carry . sum . map fromIntegral $ values
         carry :: Word32 -> Word32
         carry x = (x .&. 0xffff) + (x `shiftR` 16)
 
@@ -58,9 +56,6 @@ writeAlignedStruct ptr members =
                 W8  v   ->  sizeOf v
                 W16 v   ->  sizeOf v
                 W32 v   ->  sizeOf v
-                I8  v   ->  sizeOf v
-                I16 v   ->  sizeOf v
-                I32 v   ->  sizeOf v
         offsets =
             take (length members) $ scanl (+) 0 $ map sizeOfMember members
         writeStructMember (member, offset) =
@@ -68,9 +63,6 @@ writeAlignedStruct ptr members =
                 W8  v   ->  pokeByteOff ptr offset v
                 W16 v   ->  pokeByteOff ptr offset v
                 W32 v   ->  pokeByteOff ptr offset v
-                I8  v   ->  pokeByteOff ptr offset v
-                I16 v   ->  pokeByteOff ptr offset v
-                I32 v   ->  pokeByteOff ptr offset v
 
 main = do
     --送受信のためのバッファを用意
