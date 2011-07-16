@@ -8,6 +8,39 @@ import Control.Monad
 import Network.Socket
 import System.Environment
 import Network.BSD
+import Data.Binary
+import Data.Binary.Get
+import Data.Binary.Put
+
+data ICMPHeader = EchoMessage {
+    ecType      ::  Word8,
+    ecCode      ::  Word8,
+    ecChkSum    ::  Word16,
+    ecIdentifier::  Word16,
+    ecSeqNum    ::  Word16
+}
+
+instance Binary ICMPHeader where
+    put h = do
+        putWord8 $ ecType h
+        putWord8 $ ecCode h
+        putWord16be $ ecChkSum h
+        putWord16be $ ecIdentifier h
+        putWord16be $ ecSeqNum h
+
+    get = do
+        typ <- getWord8
+        code <- getWord8
+        chk <- getWord16be
+        ident <- getWord16be
+        seq <- getWord16be
+        return $ EchoMessage {
+                    ecType = typ,
+                    ecCode = code,
+                    ecChkSum = chk,
+                    ecIdentifier = ident,
+                    ecSeqNum = seq
+                }
 
 --IPヘッダでのICMPのプロトコル番号
 kIPPROTO_ICMP            =   1
