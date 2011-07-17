@@ -21,20 +21,20 @@ data ICMPHeader = EchoMessage {
     ecChkSum    ::  Word16,
     ecIdentifier::  Word16,
     ecSeqNum    ::  Word16
-}
+} deriving (Show, Eq)
 
 instance Binary ICMPHeader where
     put h = do
         putWord8 $ ecType h
         putWord8 $ ecCode h
-        putWord16be $ ecChkSum h
+        putWord16le $ ecChkSum h
         putWord16be $ ecIdentifier h
         putWord16be $ ecSeqNum h
 
     get = do
         typ <- getWord8
         code <- getWord8
-        chk <- getWord16be
+        chk <- getWord16le
         ident <- getWord16be
         seq <- getWord16be
         return $ EchoMessage {
@@ -72,7 +72,7 @@ calcChkSum src = do
         packTo16 :: [Word8] -> [Word16]
         packTo16 [] = []
         packTo16 (x1:x2:xs) =
-            (fromIntegral x2 `shiftL` 16 .|. fromIntegral x1):(packTo16 xs)
+            (fromIntegral x2 `shiftL` 8 .|. fromIntegral x1):(packTo16 xs)
         
         calcChkSum' values =
             fromIntegral
@@ -89,7 +89,7 @@ main = do
                         ecType = kICMP_ECHO,
                         ecCode = 0,
                         ecSeqNum = 0,
-                        ecIdentifier = 0,
+                        ecIdentifier = 1234,
                         ecChkSum = 0
                         }
     let chksum = calcChkSum buf
@@ -105,15 +105,8 @@ main = do
     (resp, addr) <- recvFrom sock (kIPHeaderLength + kICMPHeaderLength)
 
     --IPヘッダ中のプロトコル番号と、ICMP通知の種類を取得
-    {-
-    let protocol <- peekByteOff buf kIPProtocolTypeOffset :: IO Word8
-    let icmptype <- peekByteOff buf kIPHeaderLength :: IO Word8
-
-    --プロトコルがICMPで、通知がECHOREPLYならping成功
-    if protocol == fromIntegral kIPPROTO_ICMP && icmptype == kICMP_ECHOREPLY
-        then putStrLn "Response came!"
-        else putStrLn "Response error!"
-    -}
+    print $ resp `B.index` kIPProtocolTypeOffset
+    print $ (decode . BL.drop (fromIntegral kIPHeaderLength) . BL.pack . B.unpack $ resp :: ICMPHeader)
 
     --ソケットを閉じる
     sClose sock
