@@ -30,7 +30,6 @@ instance Binary ICMPHeader where
         putWord16le $ ecChkSum h
         putWord16be $ ecIdentifier h
         putWord16be $ ecSeqNum h
-
     get = do
         typ <- getWord8
         code <- getWord8
@@ -81,11 +80,13 @@ calcChkSum src = do
         carry x = (x .&. 0xffff) + (x `shiftR` 16)
 
 writeChkSum bs chk =
-    let header = decode bs in
-        encode $ header {ecChkSum = chk}
+    encode $ (decode bs) {ecChkSum = chk}
+
+deLazy = B.pack . BL.unpack
+enLazy = BL.pack . B.unpack
 
 main = do
-    let buf = B.pack . BL.unpack . encode $ EchoMessage {
+    let buf = deLazy . encode $ EchoMessage {
                         ecType = kICMP_ECHO,
                         ecCode = 0,
                         ecSeqNum = 0,
@@ -98,15 +99,21 @@ main = do
     host <- getArgs
     hostentry <- getHostByName $ head host
 
-    let buf2 = B.pack . BL.unpack $ writeChkSum (BL.pack $ B.unpack buf) chksum
+    let buf2 = deLazy $ writeChkSum (BL.pack $ B.unpack buf) chksum
 
     --ICMPパケットを送信、レスポンスを受信
     sendAllTo sock buf2 $ SockAddrInet 0 $ hostAddress hostentry
     (resp, addr) <- recvFrom sock (kIPHeaderLength + kICMPHeaderLength)
 
     --IPヘッダ中のプロトコル番号と、ICMP通知の種類を取得
-    print $ resp `B.index` kIPProtocolTypeOffset
-    print $ (decode . BL.drop (fromIntegral kIPHeaderLength) . BL.pack . B.unpack $ resp :: ICMPHeader)
+    let protocolNum = resp `B.index` kIPProtocolTypeOffset
+        respICMP = (decode . BL.drop (fromIntegral kIPHeaderLength) . enLazy $ resp :: ICMPHeader)
+        respType = ecType respICMP
+        respSeqNum = ecSeqNum respICMP
+
+    if protocolNum == fromIntegral kIPPROTO_ICMP && respType == kICMP_ECHOREPLY
+    then putStrLn "Echo reply received"
+    else putStrLn "Something is wrong!"
 
     --ソケットを閉じる
     sClose sock
