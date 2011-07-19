@@ -3,7 +3,7 @@
 --------------------------------------------------------------------------------
 module Main where
 
-import Foreign
+import Data.Bits
 import Control.Monad
 import Network.Socket hiding (send, sendTo, recv, recvFrom)
 import Network.Socket.ByteString
