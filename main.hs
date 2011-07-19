@@ -15,6 +15,7 @@ import Data.Binary.Put
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 
+--ICMPヘッダを表す型
 data ICMPHeader = EchoMessage {
     ecType      ::  Word8,
     ecCode      ::  Word8,
@@ -23,6 +24,7 @@ data ICMPHeader = EchoMessage {
     ecSeqNum    ::  Word16
 } deriving (Show, Eq)
 
+--ICMPHeaderをバイナリにシリアライズ・デシリアライズできるように
 instance Binary ICMPHeader where
     put h = do
         putWord8 $ ecType h
@@ -64,24 +66,29 @@ kICMP_ECHO               =   8
 calcChkSum src = do
     calcChkSum' $ packTo16 $ B.unpack $ pad src
     where
+        --バッファの長さが奇数バイトなら末尾に0を足して偶数にする
         pad xs
             | odd $ B.length xs = xs `B.snoc` 0
             | otherwise         = xs
 
+        --2バイトごとにまとめてWord16の配列にする
         packTo16 :: [Word8] -> [Word16]
         packTo16 [] = []
         packTo16 (x1:x2:xs) =
             (fromIntegral x2 `shiftL` 8 .|. fromIntegral x1):(packTo16 xs)
         
+        --実際にチェックサムを計算する 
         calcChkSum' values =
             fromIntegral
                 . complement . carry . carry . sum . map fromIntegral $ values
         carry :: Word32 -> Word32
         carry x = (x .&. 0xffff) + (x `shiftR` 16)
 
-writeChkSum bs chk =
+--チェックサムを付加する
+addChkSum bs chk =
     encode $ (decode bs) {ecChkSum = chk}
 
+--Data.ByteStringとData.ByteString.Lazyを相互変換する
 deLazy = B.pack . BL.unpack
 enLazy = BL.pack . B.unpack
 
@@ -99,7 +106,7 @@ main = do
     host <- getArgs
     hostentry <- getHostByName $ head host
 
-    let buf2 = deLazy $ writeChkSum (BL.pack $ B.unpack buf) chksum
+    let buf2 = deLazy $ addChkSum (BL.pack $ B.unpack buf) chksum
 
     --ICMPパケットを送信、レスポンスを受信
     sendAllTo sock buf2 $ SockAddrInet 0 $ hostAddress hostentry
