@@ -14,6 +14,7 @@ import Data.Binary.Get
 import Data.Binary.Put
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
+import System.Time
 
 --ICMPヘッダを表す型
 data ICMPHeader = EchoMessage {
@@ -109,6 +110,7 @@ main = do
     let buf2 = deLazy $ addChkSum (BL.pack $ B.unpack buf) chksum
 
     --ICMPパケットを送信、レスポンスを受信
+    startTime <- getClockTime
     sendAllTo sock buf2 $ SockAddrInet 0 $ hostAddress hostentry
     (resp, addr) <- recvFrom sock (kIPHeaderLength + kICMPHeaderLength)
 
@@ -121,6 +123,11 @@ main = do
     if protocolNum == fromIntegral kIPPROTO_ICMP && respType == kICMP_ECHOREPLY
     then putStrLn "Echo reply received"
     else putStrLn "Something is wrong!"
+
+    endTime <- getClockTime
+    putStr "Elapsed Time:"
+    putStr . show . (/10^9) .fromIntegral .  tdPicosec $ diffClockTimes endTime startTime
+    putStrLn "[ms]"
 
     --ソケットを閉じる
     sClose sock
